@@ -11,12 +11,16 @@ const cache = "https://d1lys6imrj0r6g.cloudfront.net"
 const dumpDir = "dump"
 
 logRequest = (proxyReq, req, res) => {
-	var reqData = "";
-	req.on('data', function(chunk){ reqData += chunk})
+	var reqData = [];
+	req.on('data', function(chunk){ reqData.push(chunk)})
 	req.on('end', function(){
-		console.log(reqData);
+		fs.mkdir(appDir + dumpDir + req.path + '/' + req.method, { recursive: true }, (err) => {
+			if (err) throw err;
+			fs.writeFileSync(appDir + dumpDir + req.path + '/' + req.method + '/req_' + Date.now(), Buffer.concat(reqData));
+		});
+		console.log(Buffer.concat(reqData));
 	});
-	//console.log(proxyReq.headers);
+	console.log(proxyReq.headers);
 
 	var body = [];
 	proxyReq.on('data', function(data) {
@@ -25,7 +29,7 @@ logRequest = (proxyReq, req, res) => {
 	proxyReq.on('end', () => {
 		fs.mkdir(appDir + dumpDir + req.path + '/' + req.method, { recursive: true }, (err) => {
 			if (err) throw err;
-			fs.writeFileSync(appDir + dumpDir + req.path + '/' + req.method + '/' + Date.now(), Buffer.concat(body));
+			fs.writeFileSync(appDir + dumpDir + req.path + '/' + req.method + '/res_' + Date.now(), Buffer.concat(body));
 		});
 	});
 }
@@ -39,6 +43,14 @@ app.use('/ap.conf', createProxyMiddleware({ target: apconf, changeOrigin: true,
 	onProxyRes: logRequest,
 	onProxyReq: logRequest
 }));
+
+app.use('/api/getparams.php', (req, resp) => {
+	resp.send(fs.readFileSync(appDir + dumpDir + '/api/getparams.php' + req.path + '/' + req.method + '/' + 'apiparams.json'));
+});
+
+app.use('/api/getlocdat.php', (req, resp) => {
+	resp.send(fs.readFileSync(appDir + dumpDir + '/api/getlocdat.php' + req.path + '/' + req.method + '/' + 'locdat.json'));
+});
 
 app.use('/api', createProxyMiddleware({ target: backend, changeOrigin: true,
 	onProxyRes: logRequest,
